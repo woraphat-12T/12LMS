@@ -306,6 +306,7 @@ const summaryData = ref({
     DAE0B4: ''
   },
   calpallet: {
+    DSDT:'',
     CONN: '',
     FG_AMOUNT: 0,
     Total_cost: 0,
@@ -349,6 +350,7 @@ async function handleSearch() {
         if (summary.calpallet && summary.calpallet.length > 0) {
           const calpallet = summary.calpallet[0];
           summaryData.value.calpallet = {
+            DSDT: calpallet.DSDT || '',
             CONN: calpallet.CONN || '',
             FG_AMOUNT: calpallet.FG_AMOUNT || 0,
             Total_cost: calpallet.Total_cost || 0,
@@ -365,7 +367,7 @@ async function handleSearch() {
       transportCostData.value = [];
       summaryData.value = {
         truckInfo: { DAFWNO: '', IDSUNM: '', DAE0B4: '' },
-        calpallet: { CONN: '', FG_AMOUNT: 0, Total_cost: 0, palletcost: 0, helper_cost: 0, EXTRA: 0, COST: 0, ISPERCEN: '', OILRETENTION: 0 }
+        calpallet: { DSDT:'',CONN: '', FG_AMOUNT: 0, Total_cost: 0, palletcost: 0, helper_cost: 0, EXTRA: 0, COST: 0, ISPERCEN: '', OILRETENTION: 0 }
       };
     }
   } catch (e) {
@@ -373,7 +375,7 @@ async function handleSearch() {
     transportCostData.value = [];
     summaryData.value = {
       truckInfo: { DAFWNO: '', IDSUNM: '', DAE0B4: '' },
-      calpallet: { CONN: '', FG_AMOUNT: 0, Total_cost: 0, palletcost: 0, helper_cost: 0, EXTRA: 0, COST: 0, ISPERCEN: '', OILRETENTION: 0 }
+      calpallet: {DSDT:'', CONN: '', FG_AMOUNT: 0, Total_cost: 0, palletcost: 0, helper_cost: 0, EXTRA: 0, COST: 0, ISPERCEN: '', OILRETENTION: 0 }
     };
   } finally {
     isLoading.value = false;
@@ -426,7 +428,7 @@ const exportToExcel = async () => {
   // Header section
   sheet.addRow(['', '', '', 'รายงานค่าขนส่ง', '', '', '', '', '']); // r0
   sheet.addRow(['รหัส : '+summary.truckInfo.DAFWNO || '', '', 'ชื่อ : '+summary.truckInfo.IDSUNM || '', '', 'เส้นทาง : '+summary.truckInfo.DAE0B4 || '', '', '', '', '']); // r1
-  sheet.addRow(['เลขที่ : '+summary.calpallet.CONN || '', '', 'วันที่ : '+dateStr, '', '', '', '', '', '']); // r2
+  sheet.addRow(['เลขที่ : '+summary.calpallet.CONN || '', '', 'วันที่ : '+summary.calpallet.DSDT, '', '', '', '', '', '']); // r2
   sheet.addRow([]); // r3 (empty)
 
   // Table header
@@ -598,8 +600,8 @@ const exportToPdf = async () => {
   const doc = new jsPDF('p', 'mm', 'a4');
   
   // เพิ่ม font Sarabun สำหรับภาษาไทย
-  doc.addFont('/src/assets/my-fonts/THSarabun.ttf', 'Sarabun', 'normal');
-  doc.addFont('/src/assets/my-fonts/THSarabun-Bold.ttf', 'Sarabun', 'bold');
+  doc.addFont('/my-fonts/THSarabun.ttf', 'Sarabun', 'normal');
+  doc.addFont('/my-fonts/THSarabun-Bold.ttf', 'Sarabun', 'bold');
   
   // ตั้งค่า font สำหรับภาษาไทย
   doc.setFont('Sarabun');
