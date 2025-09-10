@@ -377,7 +377,8 @@ const menuData = {
       'Management': {
         icon: 'mdi:cog',
         children: [
-           'อัพโหลดไฟล์วางแผน'
+          'อัพโหลดไฟล์วางแผน',
+          'แพลนพิเศษ'
         ]
       }
     }
@@ -455,7 +456,8 @@ function getRoutePath(system, category, item) {
       'Reports': {
       },
       'Management': {
-        'อัพโหลดไฟล์วางแผน': '/upload-excel'
+        'อัพโหลดไฟล์วางแผน': '/upload-excel',
+        'แพลนพิเศษ': '/mms/manage/special-plan'
       }
     }
   };

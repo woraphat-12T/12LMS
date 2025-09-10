@@ -4,7 +4,7 @@ const authStore = useAuthStore()
 import SideBar from "@/components/sideBar.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import { useRoute } from 'vue-router';
-import { ref, computed } from 'vue';
+import { ref, computed, provide } from 'vue';
 const route = useRoute();
 
 const sideBarRef = ref();
@@ -14,6 +14,17 @@ const showOverlay = computed(() =>
   isDailyStockPage.value &&
   sideBarRef.value && sideBarRef.value.isCollapsed === false
 );
+
+// Computed property for sidebar width
+const sidebarWidth = computed(() => {
+  if (!sideBarRef.value) return 300; // default width when sidebar is expanded
+  return sideBarRef.value.isCollapsed ? 130 : 300;
+});
+
+// Provide sidebar state to child components
+provide('sidebarWidth', sidebarWidth);
+provide('isSidebarCollapsed', computed(() => sideBarRef.value?.isCollapsed || false));
+
 function closeSideBar() {
   if (sideBarRef.value) sideBarRef.value.isCollapsed = true;
 }

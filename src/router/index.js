@@ -29,6 +29,9 @@ const routes = [
   { path: '/oms/manage/shipcost-edit', name: 'shipcost-edit', component: () => import('../views/oms/manage/shipcostEditView.vue'), meta: { requiresAuth: true, breadcrumb: 'OMS / จัดการ / แก้ไขค่าขนส่ง' } },
   { path: '/manage/user', name: 'user-management', component: () => import('../views/manage/userView.vue'), meta: { requiresAuth: true, breadcrumb: 'จัดการสิทธิ์การใช้งาน' } },
   { path: '/manage/warehouse', name: 'warehouse-management', component: () => import('../views/manage/warehouseView.vue'), meta: { requiresAuth: true, breadcrumb: 'จัดการศูนย์กระจายสินค้า' } },
+  { path: '/mms', redirect: '/mms/manage/special-plan', meta: { requiresAuth: true } },
+  { path: '/mms/manage', redirect: '/mms/manage/special-plan', meta: { requiresAuth: true } },
+  { path: '/mms/manage/special-plan', name: 'special-plan', component: () => import('../views/mms/manage/specialPlanView.vue'), meta: { requiresAuth: true, breadcrumb: 'MMS / จัดการ / แพลนพิเศษ' } },
   { path: '/logout', name: 'Logout', beforeEnter: (to, from, next) => {
     const authStore = useAuthStore();
     authStore.logout();
@@ -79,12 +82,19 @@ router.beforeEach(async (to, from, next) => {
 
   // Check if route requires authentication
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next('/login');
+    // Store the intended URL for redirect after login
+    const redirectUrl = to.fullPath;
+    next(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
     return;
   }
 
   // Check if route requires guest (not authenticated)
   if (to.meta.requiresGuest && authStore.isAuthenticated) {
+    // If there's a redirect parameter, don't redirect away from login page
+    if (to.name === 'login' && to.query.redirect) {
+      next();
+      return;
+    }
     next('/dashboard');
     return;
   }

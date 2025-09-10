@@ -185,8 +185,15 @@ export const useOmsBacklogStore = defineStore('omsBacklog', () => {
     const formatDate = (dateString) => {
         const date = new Date(dateString);
         const day = date.getDate();
-        const month = date.getMonth() + 1;
-        return `${day}-${month}`;
+        const month = date.getMonth();
+        
+        // แปลงเดือนเป็นตัวย่อภาษาไทย
+        const thaiMonths = [
+            'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+            'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+        ];
+        
+        return `${day} ${thaiMonths[month]}`;
     };
 
     const getProvinceTotal = (province, date) => {
@@ -209,6 +216,64 @@ export const useOmsBacklogStore = defineStore('omsBacklog', () => {
             }
         });
         return total > 0 ? total : null;
+    };
+
+    // ฟังก์ชันอัปเดตเหตุผลและหมายเหตุ
+    const updateReason = async (detail) => {
+        try {
+            // ดึงข้อมูล user จาก localStorage
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const empId = user.employeeID || '';
+            
+            // สร้างข้อมูลที่จะส่งไปยัง API ตาม format ที่กำหนด
+            const updateData = {
+                poNo: detail.po_no,
+                note: detail.note || '',
+                noteEtc: detail.note_etc || '',
+                postponeDelivery: detail.pastpone_delivery || '',
+                empId: empId
+            };
+            
+            // Log ข้อมูลที่จะส่งไป
+            console.log('=== ข้อมูลที่จะส่งไปยัง updateReason ===');
+            console.log('poNo:', updateData.poNo);
+            console.log('note:', updateData.note);
+            console.log('noteEtc:', updateData.noteEtc);
+            console.log('postponeDelivery:', updateData.postponeDelivery);
+            console.log('empId:', updateData.empId);
+            console.log('=====================================');
+            
+            // เรียก API เพื่ออัปเดตข้อมูล
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+            const url = `${baseUrl}/api/oms/manage/backlog/update`;
+            
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updateData)
+            });
+            
+            const result = await response.json();
+            console.log('API Response:', result);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            if (result.success) {
+                console.log('อัปเดตข้อมูลสำเร็จ:', result);
+            } else {
+                console.error('เกิดข้อผิดพลาดในการอัปเดต:', result.message || 'Unknown error');
+                throw new Error(result.message || 'Unknown error');
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('เกิดข้อผิดพลาดใน updateReason:', error);
+            throw error;
+        }
     };
 
     return {
@@ -244,6 +309,7 @@ export const useOmsBacklogStore = defineStore('omsBacklog', () => {
         // Utility functions
         formatDate,
         getProvinceTotal,
-        getCustomerTotal
+        getCustomerTotal,
+        updateReason
     };
 }); 

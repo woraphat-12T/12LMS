@@ -1,23 +1,23 @@
 <template>
-    <div class="flex-1 bg-gray-50 min-h-screen">
+    <div class="flex-1 bg-gray-50" style="min-height: calc(100vh - 120px);">
         <PageHeader>
             <template #actions>
                 <div class="flex flex-col sm:flex-row gap-3 pl-5 items-end bg-white shadow-md rounded-lg p-2">
                     <div class=" flex flex-row gap-1 items-center">
 
-                        <button type="button" @click="showConfirmReload = true"
+                        <button type="button" @click="confirmReload"
                             :disabled="isLoadingTransport || isReloading"
                             class="text-white bg-red-600 hover:bg-red-700 focus:ring-4 focus:outline-none focus:ring-red-300 font-medium rounded-lg text-xs px-3 py-1.5 text-center inline-flex items-center justify-center dark:focus:ring-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                             <Icon v-if="isReloading" icon="mdi:loading" class="animate-spin w-4 h-4 mr-1.5" />
                             <Icon v-else icon="mdi:database-sync" width="16" height="16" class="mr-1.5" />
                             {{ isReloading ? 'กำลังประมวลผล...' : 'ดึงข้อมูลใหม่' }}
                         </button>
-                        <button type="button" @click="showConfirmReload = true"
-                            :disabled="isLoadingTransport || isReloading"
+                        <button type="button" @click="exportToExcel"
+                            :disabled="isLoadingTransport || isExporting"
                             class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-xs px-3 py-1.5 text-center inline-flex items-center justify-center dark:focus:ring-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                            <Icon v-if="isReloading" icon="mdi:loading" class="animate-spin w-4 h-4 mr-1.5" />
-                            <Icon v-else icon="mdi:database-sync" width="16" height="16" class="mr-1.5" />
-                            {{ isReloading ? 'กำลังดึงข้อมูล...' : 'export excel' }}
+                            <Icon v-if="isExporting" icon="mdi:loading" class="animate-spin w-4 h-4 mr-1.5" />
+                            <Icon v-else icon="mdi:file-excel" width="16" height="16" class="mr-1.5" />
+                            {{ isExporting ? 'กำลังส่งออก...' : 'Export Excel' }}
                         </button>
 
                     </div>
@@ -51,7 +51,7 @@
         </PageHeader>
 
         <!-- Table Section -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200" style="min-height: calc(100vh - 120px);">
             <!-- Loading State -->
             <div v-if="omsBacklogStore.isLoadingData" class="flex items-center justify-center p-8">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -63,8 +63,8 @@
             </div>
 
             <!-- Data Table with Custom Scrollbar -->
-            <div class="relative shadow-md sm:rounded-lg custom-scrollbar p-2 overflow-x-auto overflow-y-hidden"
-                style="max-height: calc(100vh - 120px);">
+            <div class="relative shadow-md sm:rounded-lg custom-scrollbar p-2 overflow-x-hidden overflow-y-hidden"
+                style="height: calc(100vh - 120px);">
                 <!-- Summary Info -->
                 <div class="mb-2 p-2 bg-blue-50 text-xs">
                     <div class="grid grid-cols-3 gap-4">
@@ -83,115 +83,133 @@
                         </div>
                     </div>
                 </div>
+                <div class="flex items-center justify-between bg-[#F3F4F6] mb-2 rounded-lg p-2">
+                    <div class="flex items-center space-x-4">
+      <!-- Record Count -->
+                 <ResultCount :label="'ผลลัพธ์:'" :current="omsBacklogStore.filteredPlanningData.length"
+                        :total="omsBacklogStore.filteredPlanningData.length" icon="mdi:clipboard-text-outline"
+                        iconColor="#00569D" />
+                          <!-- Scroll Left Button -->
+                    <button 
+                        v-show="showScrollLeftButton"
+                        @click="scrollToLeft"
+                        class="bg-white text-xs border border-gray-300 shadow-sm rounded-md px-2 py-1 flex items-center gap-0.5 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="เลื่อนไปซ้ายสุด">
+                      
+                        <Icon icon="mdi:chevron-left" class="w-5 h-5 text-[#00569D]" /> 
+                        <span class="text-xs text-[#00569D]">เลื่อนไปซ้ายสุด</span>
+                    </button>
 
-                <div class="virtual-table-container rounded-t-lg overflow-auto" style="height: calc(100vh - 180px);">
+                    <!-- Scroll Right Button -->
+                    <button 
+                    v-show="showScrollRightButton"        
+                        @click="scrollToRight"
+                        class="bg-white text-xs border border-gray-300 shadow-sm rounded-md px-2 py-1 flex items-center gap-0.5 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="เลื่อนไปขวาสุด">
+                        <span class="text-xs text-[#00569D]">เลื่อนไปขวาสุด</span>
+                        <Icon icon="mdi:chevron-right" class="w-5 h-5 text-[#00569D]" /> 
+                    </button>
+                    </div>
+              
+                    <div class="flex items-center space-x-4 ">
+
+                        <!-- Province Filter -->
+                        <div class="relative" ref="provinceDropdownRef">
+                            <button @click="toggleProvinceDropdown" :disabled="availableProvinces.length === 0"
+                                class="text-white bg-[#F47A30] text-xs hover:bg-[#F47A30]/80 disabled:bg-gray-400 focus:ring-4 focus:outline-none focus:ring-[#F47A30]/30 font-medium rounded-lg px-3 py-1.5 text-center inline-flex items-center transition-colors shadow-sm"
+                                type="button">
+                                <Icon icon="mdi:map-marker" class="w-4 h-4 mr-2" />
+                                จังหวัด {{ selectedProvinces.length > 0 ?
+                                    `(${selectedProvinces.length})` :
+                                '' }}{{ availableProvinces.length ===
+                                    0 ? ' (ไม่มีข้อมูล)' : '' }}
+                                <svg class="w-2 h-2 ml-2 transition-transform"
+                                    :class="{ 'rotate-180': showProvinceDropdown }" aria-hidden="true"
+                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                        stroke-width="2" d="m1 1 4 4 4-4" />
+                                </svg>
+                            </button>
+
+                            <!-- Province Dropdown menu -->
+                            <div v-show="showProvinceDropdown" @click.stop
+                                                                 class="absolute right-0 mt-2 w-80 md:w-96 lg:w-[500px] bg-white divide-y divide-gray-100 rounded-lg shadow-lg border border-gray-200 dark:bg-gray-800 dark:divide-gray-600 dark:border-gray-700 z-[70]">
+                                <div class="p-3">
+                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                                        เลือกจังหวัด</h3>
+                                    <div v-if="availableProvinces.length === 0"
+                                        class="text-sm text-gray-500 text-center py-4">
+                                        กรุณากดปุ่ม "ดึงข้อมูล" ก่อนเพื่อโหลดข้อมูลจังหวัด
+                                    </div>
+                                    <div v-else
+                                        class="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-3 gap-2 text-sm text-gray-700 dark:text-gray-200">
+                                        <div v-for="province in availableProvinces" :key="province"
+                                            class="flex items-center p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                            @click.stop>
+                                            <input :id="`province-${province}`" type="checkbox"
+                                                v-model="selectedProvinces" :value="province"
+                                                class="w-4 h-4 text-[#00569D] bg-gray-100 border-gray-300 rounded focus:ring-[#00569D] dark:focus:ring-[#00569D] dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                            <label :for="`province-${province}`"
+                                                class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300 flex items-center truncate">
+                                                {{ province }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-b-lg">
+                                    <div v-if="selectedProvinces.length === 0"
+                                        class="text-xs text-gray-500 mb-2 text-center">
+                                        เลือกจังหวัดอย่างน้อย 1 รายการ
+                                    </div>
+                                    <div class="flex flex-row gap-2">
+                                        <button @click="applyProvinceFilter"
+                                            class="w-full bg-[#00569D] hover:bg-[#004080] disabled:bg-gray-400 text-white text-sm font-medium py-2 px-3 rounded-md transition-colors">
+                                            ค้นหา
+                                        </button>
+
+
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Search Input -->
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                <Icon icon="mdi:magnify" class="w-4 h-4 text-gray-400" />
+                            </div>
+                            <input type="text" v-model="omsBacklogStore.searchQuery" placeholder="ค้นหา..."
+                                class="w-64 pl-10 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400">
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="virtual-table-container rounded-t-lg overflow-auto relative" style="max-height: calc(100vh - 260px)"
+                    :style="{ maxWidth: tableMaxWidth }" ref="tableContainer">
                     <table
                         class="w-full text-xs text-left text-gray-500 dark:text-gray-400 border-collapse border border-gray-300 dark:border-gray-600 mb-8">
                         <thead
-                            class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-700 dark:text-gray-400 sticky top-0 z-10">
-                            <tr>
+                            class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-700 dark:text-gray-400 ">
+                            <!-- <tr>
                                 <th :colspan="omsBacklogStore.processedData.dateRange ? omsBacklogStore.processedData.dateRange.allDates.length + 2 : 4"
                                     class="px-4 py-3 border-b border-gray-200 dark:border-gray-600">
-                                    <div class="flex items-center justify-between">
-
-                                        <!-- Record Count -->
-                                        <ResultCount :label="'ผลลัพธ์:'"
-                                            :current="omsBacklogStore.filteredPlanningData.length"
-                                            :total="omsBacklogStore.filteredPlanningData.length"
-                                            icon="mdi:clipboard-text-outline" iconColor="#00569D" />
-                                        <div class="flex items-center space-x-4">
-                                            
-                                            <!-- Province Filter -->
-                                            <div class="relative" ref="provinceDropdownRef">
-                                                <button @click="toggleProvinceDropdown"
-                                                    :disabled="availableProvinces.length === 0"
-                                                    class="text-white bg-[#F47A30] text-xs hover:bg-[#F47A30]/80 disabled:bg-gray-400 focus:ring-4 focus:outline-none focus:ring-[#F47A30]/30 font-medium rounded-lg px-3 py-1.5 text-center inline-flex items-center transition-colors shadow-sm"
-                                                    type="button">
-                                                    <Icon icon="mdi:map-marker" class="w-4 h-4 mr-2" />
-                                                    จังหวัด {{ selectedProvinces.length > 0 ?
-                                                    `(${selectedProvinces.length})` :
-                                                    '' }}{{ availableProvinces.length ===
-                                                        0 ? ' (ไม่มีข้อมูล)' : '' }}
-                                                    <svg class="w-2 h-2 ml-2 transition-transform"
-                                                        :class="{ 'rotate-180': showProvinceDropdown }"
-                                                        aria-hidden="true" xmlns="http://www.w3.org/2000/svg"
-                                                        fill="none" viewBox="0 0 10 6">
-                                                        <path stroke="currentColor" stroke-linecap="round"
-                                                            stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4" />
-                                                    </svg>
-                                                </button>
-
-                                                <!-- Province Dropdown menu -->
-                                                <div v-show="showProvinceDropdown" @click.stop
-                                                    class="absolute right-0 mt-2 w-80 md:w-96 lg:w-[500px] bg-white divide-y divide-gray-100 rounded-lg shadow-lg border border-gray-200 dark:bg-gray-800 dark:divide-gray-600 dark:border-gray-700 z-50">
-                                                    <div class="p-3">
-                                                        <h3
-                                                            class="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                                                            เลือกจังหวัด</h3>
-                                                        <div v-if="availableProvinces.length === 0"
-                                                            class="text-sm text-gray-500 text-center py-4">
-                                                            กรุณากดปุ่ม "ดึงข้อมูล" ก่อนเพื่อโหลดข้อมูลจังหวัด
-                                                        </div>
-                                                        <div v-else
-                                                            class="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-3 gap-2 text-sm text-gray-700 dark:text-gray-200">
-                                                            <div v-for="province in availableProvinces" :key="province"
-                                                                class="flex items-center p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                                                                @click.stop>
-                                                                <input :id="`province-${province}`" type="checkbox"
-                                                                    v-model="selectedProvinces" :value="province"
-                                                                    class="w-4 h-4 text-[#00569D] bg-gray-100 border-gray-300 rounded focus:ring-[#00569D] dark:focus:ring-[#00569D] dark:ring-offset-gray-800 dark:focus:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
-                                                                <label :for="`province-${province}`"
-                                                                    class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300 flex items-center truncate">
-                                                                    {{ province }}
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-b-lg">
-                                                        <div v-if="selectedProvinces.length === 0"
-                                                            class="text-xs text-gray-500 mb-2 text-center">
-                                                            เลือกจังหวัดอย่างน้อย 1 รายการ
-                                                        </div>
-                                                        <div class="flex flex-row gap-2">
-                                                            <button @click="applyProvinceFilter"
-                                                            class="w-full bg-[#00569D] hover:bg-[#004080] disabled:bg-gray-400 text-white text-sm font-medium py-2 px-3 rounded-md transition-colors">
-                                                            ค้นหา
-                                                        </button>
-
-                                                       
-                                                        </div>
-                                                        
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Search Input -->
-                                            <div class="relative">
-                                                <div
-                                                    class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                                    <Icon icon="mdi:magnify" class="w-4 h-4 text-gray-400" />
-                                                </div>
-                                                <input type="text" v-model="omsBacklogStore.searchQuery"
-                                                    placeholder="ค้นหา..."
-                                                    class="w-64 pl-10 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400">
-                                            </div>
-
-                                        </div>
-                                    </div>
+                                    
                                 </th>
-                            </tr>
+                            </tr> -->
                             <tr>
                                 <th scope="col"
-                                    class="px-2 py-2 text-left w-48 border border-gray-300 dark:border-gray-600 bg-gray-50">
+                                    class="px-2 sticky top-0 z-10 left-0 py-2 text-left w-48 border border-gray-300 dark:border-gray-600 bg-gray-50">
                                     จังหวัด
                                 </th>
                                 <!-- Date Columns -->
                                 <th v-for="date in omsBacklogStore.processedData.dateRange?.allDates" :key="date"
                                     scope="col"
-                                    class="px-2 py-2 text-center w-16 border border-gray-300 dark:border-gray-600 bg-gray-50">
+                                    class="px-2 sticky top-0 z-9 py-2 text-center w-16 border border-gray-300 dark:border-gray-600 bg-gray-50">
                                     {{ omsBacklogStore.formatDate(date) }}
                                 </th>
                                 <th scope="col"
-                                    class="px-2 py-2 text-center w-20 border border-gray-300 dark:border-gray-600 bg-gray-200">
+                                    class="px-2 sticky z-10  top-0 right-0 bg-gray-100 py-2 text-center w-20 border border-gray-300 dark:border-gray-600 bg-gray-200">
                                     Total
                                 </th>
                             </tr>
@@ -208,10 +226,10 @@
                                 <!-- Parent rows (provinces) and Child rows (customers) -->
                                 <template v-for="province in omsBacklogStore.filteredPlanningData" :key="province.id">
                                     <!-- Parent row (province) -->
-                                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 font-semibold bg-yellow-50 cursor-pointer"
-                                        @click="omsBacklogStore.toggleRow(province.id)">
+                                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 font-semibold bg-yellow-50">
                                         <td
-                                            class="px-2 py-1 text-left text-xs border border-gray-300 dark:border-gray-600">
+                                            class="px-2 sticky z-9 bg-[#FDFDEA] left-0 py-1 text-left text-xs border border-gray-300 dark:border-gray-600 cursor-pointer"
+                                            @click="omsBacklogStore.toggleRow(province.id)">
                                             <div class="flex items-center">
                                                 <span class="mr-1 cursor-pointer">
                                                     <Icon
@@ -225,11 +243,11 @@
                                         <td v-for="date in omsBacklogStore.processedData.dateRange?.allDates"
                                             :key="`province-${date}`"
                                             class="px-2 py-1 text-center text-xs border border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-blue-50"
-                                            @click="omsBacklogStore.getProvinceTotal(province, date) ? openDetailModal(province) : null">
+                                            @click.stop="omsBacklogStore.getProvinceTotal(province, date) ? openDetailModal(province, date) : null">
                                             {{ omsBacklogStore.getProvinceTotal(province, date) || '-' }}
                                         </td>
                                         <td
-                                            class="px-2 py-1 text-center text-xs font-semibold border border-gray-300 dark:border-gray-600 bg-gray-100">
+                                            class="px-2 sticky z-9 right-0 bg-gray-100py-1 text-center text-xs font-semibold border border-gray-300 dark:border-gray-600 bg-gray-100">
                                             {{ province.total || '-' }}
                                         </td>
                                     </tr>
@@ -240,9 +258,9 @@
                                         <tr v-for="child in province.children" :key="child.id"
                                             class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                             <td
-                                                class="px-2 py-1 text-left text-xs border border-gray-300 dark:border-gray-600">
+                                                class="px-2 py-1 text-left sticky z-9 bg-white left-0 text-xs border border-gray-300 dark:border-gray-600">
                                                 <div class="flex items-center">
-                                                    <span class="ml-4">•</span>
+                                                    <span class="ml-1 mr-1"><Icon icon="material-symbols:store-outline-rounded" width="16" height="16" class="text-sky-600" /></span>
                                                     {{ child.label }}
                                                 </div>
                                             </td>
@@ -250,12 +268,12 @@
                                             <td v-for="date in omsBacklogStore.processedData.dateRange?.allDates"
                                                 :key="`child-${date}`"
                                                 class="px-2 py-1 text-center text-xs border border-gray-300 dark:border-gray-600 cursor-pointer hover:bg-blue-50"
-                                                @click="child.dateData[date] && child.dateData[date] !== '-' ? openDetailModal(child) : null">
+                                                @click.stop="child.dateData[date] && child.dateData[date] !== '-'">
                                                 {{ child.dateData[date] || '-' }}
                                             </td>
                                             <td
-                                                class="px-2 py-1 text-center text-xs font-semibold border border-gray-300 dark:border-gray-600 bg-gray-100">
-                                                {{ omsBacklogStore.getCustomerTotal(child) || '-' }}
+                                                class="px-2 sticky z-9 right-0 bg-gray-100 py-1 text-center text-xs font-semibold border border-gray-300 dark:border-gray-600 bg-gray-100">
+                                                {{ omsBacklogStore.getCustomerTotal(child)  || '-' }}
                                             </td>
                                         </tr>
                                     </template>
@@ -269,9 +287,10 @@
 
         <!-- PO Detail Modal -->
         <div v-if="isPoDetailModalVisible"
-            class="fixed inset-0  bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 sm:p-16">
+            class="fixed inset-0  bg-black bg-opacity-60 z-[60] flex items-center justify-start p-4 sm:p-16">
             <div
-                class="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col transform transition-all duration-300 ease-in-out">
+                class="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col transform transition-all duration-300 ease-in-out"
+                @click.stop>
                 <!-- Modal Header -->
                 <div class="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-lg">
                     <div class="flex items-center space-x-3">
@@ -287,19 +306,22 @@
                 <div class="p-6 space-y-4 overflow-y-auto">
                     <div v-if="selectedPo" class="text-sm bg-slate-100 p-4 rounded-lg">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-1">
-                            <p><span class="font-semibold text-slate-600">เลขที่ใบสั่งซื้อ:</span> {{ selectedPo.po_no
-                                }}</p>
-                            <p><span class="font-semibold text-slate-600">คลัง:</span> {{ selectedPo.wh_no }}</p>
-                            <p><span class="font-semibold text-slate-600">แผนผลิตระหว่างวันที่:</span> 23 มิ.ย. 2025 -
-                                29 มิ.ย.
-                                2025</p>
+                            <p><span class="font-semibold text-slate-600">เลขที่ใบสั่งซื้อ:</span> 
+                                <span class="font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded">{{ selectedPo.po_no }}</span>
+                            </p>
+                            <p><span class="font-semibold text-slate-600">คลัง:</span> 
+                                <span class="font-mono bg-green-100 text-green-800 px-2 py-1 rounded">{{ selectedPo.wh_no }}</span>
+                            </p>
+                            <p><span class="font-semibold text-slate-600">จำนวนรายการ:</span> 
+                                <span class="font-mono bg-purple-100 text-purple-800 px-2 py-1 rounded">{{ backlogStore.poDetails.length }} รายการ</span>
+                            </p>
                         </div>
                     </div>
 
                     <!-- Loading State -->
                     <div v-if="backlogStore.isDetailsLoading" class="text-center py-12">
                         <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-sky-600 mx-auto"></div>
-                        <p class="mt-3 text-sm text-gray-500">กำลังโหลดข้อมูล...</p>
+                        <p class="mt-3 text-sm text-gray-500">กำลังโหลดข้อมูลรายการสินค้า...</p>
                     </div>
 
                     <!-- Error State -->
@@ -337,14 +359,19 @@
                                 <tr v-for="(detail, index) in backlogStore.poDetails" :key="detail.item_node"
                                     class="hover:bg-sky-50 transition-colors">
                                     <td class="p-3 text-center text-gray-500">{{ index + 1 }}</td>
-                                    <td class="p-3 font-mono">{{ detail.item_node.trim() }}</td>
-                                    <td class="p-3">{{ detail.item_namede }}</td>
-                                    <td class="p-3 text-right font-medium">{{ detail.bill_qtyde }}</td>
-                                    <td class="p-3 text-right">{{ detail.send_qtyde }}</td>
-                                    <td class="p-3 text-right font-semibold text-red-600">{{ detail.out_qtyde }}</td>
-                                    <td class="p-3 text-right">{{ detail.bill_status }}</td>
-                                    <td class="p-3 text-right">{{ detail.stockde || '-' }}</td>
-                                    <td class="p-3 text-right">{{ detail.planingde || '-' }}</td>
+                                    <td class="p-3 font-mono bg-gray-50 px-2 py-1 rounded">{{ detail.item_node?.trim() || '-' }}</td>
+                                    <td class="p-3 max-w-xs truncate" :title="detail.item_namede">{{ detail.item_namede || '-' }}</td>
+                                    <td class="p-3 text-right font-medium text-blue-600">{{ detail.bill_qtyde || 0 }}</td>
+                                    <td class="p-3 text-right text-green-600">{{ detail.send_qtyde || 0 }}</td>
+                                    <td class="p-3 text-right font-semibold text-red-600">{{ detail.out_qtyde || 0 }}</td>
+                                    <td class="p-3 text-center">
+                                        <span class="px-2 py-1 text-xs rounded-full" 
+                                              :class="getStatusClass(detail.bill_status)">
+                                            {{ detail.bill_status || '-' }}
+                                        </span>
+                                    </td>
+                                    <td class="p-3 text-right font-medium text-purple-600">{{ detail.stockde || 0 }}</td>
+                                    <td class="p-3 text-right font-medium text-orange-600">{{ detail.planingde || 0 }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -371,33 +398,20 @@
             </div>
         </div>
 
-        <!-- Confirm Reload Modal -->
-        <div v-if="showConfirmReload"
-            class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center">
-            <div class="bg-white rounded-lg p-6 flex flex-col items-center space-y-4">
-                <h3 class="text-lg font-semibold">ยืนยันการ Gen Back Order</h3>
-                <p>คุณต้องการสร้างข้อมูล Back Order ใหม่ใช่หรือไม่?</p>
-                <p class="text-sm text-gray-600">การดำเนินการนี้อาจใช้เวลาสักครู่</p>
-                <div class="flex space-x-4">
-                    <button @click="confirmReload" class="bg-green-600 text-white px-4 py-2 rounded">ยืนยัน</button>
-                    <button @click="showConfirmReload = false"
-                        class="bg-gray-400 text-white px-4 py-2 rounded">ยกเลิก</button>
-                </div>
-            </div>
-        </div>
+
 
         <!-- Progress Bar Loading -->
         <div v-if="isReloading" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center">
             <div class="bg-white rounded-lg p-8 flex flex-col items-center space-y-4 w-full max-w-xs">
                 <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                <p class="text-center text-gray-600 mt-2">กำลังสร้างข้อมูล Back Order...</p>
+                <p class="text-center text-gray-600 mt-2">กำลัง Import ข้อมูล Back Order...</p>
             </div>
         </div>
     </div>
 
     <!-- Detail Modal -->
     <div v-if="showDetailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 pt-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-7xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-8xl w-full mx-4 max-h-[90vh] overflow-hidden">
             <!-- Modal Header -->
             <div class="flex items-center justify-between p-4 border-b border-gray-200">
                 <h3 class="text-lg font-semibold text-gray-900">
@@ -408,121 +422,165 @@
                 </button>
             </div>
 
+            <!-- Loading State -->
+            <div v-if="isDetailLoading" class="flex items-center justify-center p-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <span class="ml-2 text-gray-600">กำลังโหลดข้อมูล...</span>
+            </div>
+
             <!-- Modal Content -->
-            <div class="p-4 overflow-auto max-h-[calc(90vh-120px)]">
+            <div v-if="!isDetailLoading" class="p-4 overflow-auto max-h-[calc(90vh-120px)]">
                 <div class="relative shadow-md sm:rounded-lg overflow-x-auto">
                     <table class="w-full text-xs text-left text-gray-500 border-collapse border border-gray-300">
                         <thead class="text-xs text-white uppercase bg-blue-600">
                             <tr>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        คลัง
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    คลัง
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        SR Date
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    SR Date
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        กำหนดส่ง2
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    กำหนดส่ง
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        เลขที่ใบสั่งซื้อ
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    เลขที่ใบสั่งซื้อ
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        รหัสลูกค้า
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    รหัสลูกค้า
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        ชื่อลูกค้า
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    ชื่อลูกค้า
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        จังหวัด2
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    จังหวัด
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        จังหวัด
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    ที่อยู่
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        เกิน
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    เกิน
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        FG
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    FG
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        PM
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    PM
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        สาเหตุสิ้นเดือน
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    สาเหตุ
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    สาเหตุปัจจุบัน
+                                    อื่นๆ (ระบุ)
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        อื่นๆ (ระบุ)
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    เลื่อนส่ง
+
                                 </th>
                                 <th class="px-2 py-2 text-center border border-gray-300">
-                                    <div class="flex items-center justify-center">
-                                        เลื่อนส่ง
-                                        <Icon icon="mdi:chevron-down" class="w-4 h-4 ml-1" />
-                                    </div>
+                                    ดำเนินการ
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(detail, index) in detailData" :key="index"
+                            <tr v-if="detailData.length === 0">
+                                <td colspan="15" class="px-4 py-8 text-center text-gray-500 border border-gray-300">
+                                    <Icon icon="mdi:database-off" class="w-8 h-8 mx-auto mb-2" />
+                                    ไม่พบข้อมูลรายละเอียด
+                                </td>
+                            </tr>
+                            <tr v-else v-for="(detail, index) in detailData" :key="index"
                                 :class="index % 2 === 0 ? 'bg-gray-100' : 'bg-white'" class="border-b border-gray-300">
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.warehouse }}</td>
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.srDate }}</td>
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.deliveryDate }}</td>
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.poNumber }}</td>
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.customerCode }}</td>
-                                <td class="px-2 py-1 text-left border border-gray-300">{{ detail.customerName }}</td>
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.province2 }}</td>
-                                <td class="px-2 py-1 text-left border border-gray-300">{{ detail.province }}</td>
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.overdue }}</td>
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.fg }}</td>
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.pm }}</td>
-                                <td class="px-2 py-1 text-left border border-gray-300">{{ detail.reasonEndMonth }}</td>
-                                <td class="px-2 py-1 text-left border border-gray-300">{{ detail.currentReason }}</td>
-                                <td class="px-2 py-1 text-left border border-gray-300">{{ detail.others }}</td>
-                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.postponeDelivery ||
+                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.wh_no || '-' }}</td>
+                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.sr_date || '-' }}
+                                </td>
+                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.date_send || '-' }}
+                                </td>
+                                <td class="px-2 py-1 text-center border border-gray-300 cursor-pointer hover:bg-blue-50" 
+                                    @click="openPoDetailModal(detail)">
+                                    <span class="text-xs bg-[#138496] text-white px-2 py-1 rounded">
+                                        {{ detail.po_no || '-' }}
+                                    </span>
+                                    
+                                </td>
+                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.cus_code?.trim() ||
                                     '-'
-                                }}</td>
+                                    }}</td>
+                                <td class="px-2 py-1 text-left border border-gray-300">{{ detail.cus_name || '-' }}</td>
+                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.name_province || '-'
+                                    }}
+                                </td>
+                                <td class="px-2 py-1 text-left border border-gray-300">{{ detail.provincebl || '-' }}
+                                </td>
+                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.od || 0 }}</td>
+                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.fg || 0 }}</td>
+                                <td class="px-2 py-1 text-center border border-gray-300">{{ detail.pm || 0 }}</td>
+                                <td class="px-2 py-1 text-left border border-gray-300">
+                                    <div v-if="!detail.editing" class="min-h-[20px] flex items-center">
+                                        {{ getReasonName(detail.note) || '-' }}
+                                    </div>
+                                    <select v-else v-model="detail.note"
+                                        class="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+                                        :disabled="isLoadingReasonOptions">
+                                        <option value="">-- เลือกสาเหตุ --</option>
+                                        <option v-for="reason in reasonOptions" :key="reason.reason_id"
+                                            :value="reason.reason_id">
+                                            {{ reason.reason_name }}
+                                        </option>
+                                    </select>
+                                </td>
+                                <td class="px-2 py-1 text-left border border-gray-300">
+                                    <div v-if="!detail.editing" class="min-h-[20px] flex items-center">
+                                        {{ detail.note_etc || '-' }}
+                                    </div>
+                                    <input v-else v-model="detail.note_etc"
+                                        class="w-full border border-gray-300 rounded px-2 py-1 text-xs" type="text"
+                                        placeholder="ใส่อื่นๆ (ระบุ)" />
+                                </td>
+                                <td class="px-2 py-1 text-left border border-gray-300">
+                                    <div v-if="!detail.editing" class="min-h-[20px] flex items-center">
+                                        {{ detail.pastpone_delivery || '-' }}
+                                    </div>
+                                    <input v-else v-model="detail.pastpone_delivery"
+                                        class="w-full border border-gray-300 rounded px-2 py-1 text-xs" type="date"
+                                        placeholder="เลือกวันที่เลื่อนส่ง" />
+                                </td>
+                                <td class="px-2 py-1 text-center border border-gray-300">
+                                    <div class="flex gap-1 justify-center">
+                                        <button v-if="!detail.editing"
+                                            class="bg-yellow-400 hover:bg-yellow-500 text-white px-2 py-1 rounded text-xs flex items-center"
+                                            @click="detail.editing = true">
+                                            <Icon icon="mdi:pencil" class="w-4 h-4 mr-1" />
+                                            แก้ไข
+                                        </button>
+                                        <template v-else>
+                                            <button
+                                                class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs flex items-center"
+                                                @click="saveDetailEdit(detail)">
+                                                <Icon icon="mdi:content-save" class="w-4 h-4 mr-1" />
+                                                บันทึก
+                                            </button>
+                                            <button
+                                                class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-2 py-1 rounded text-xs flex items-center"
+                                                @click="detail.editing = false">
+                                                <Icon icon="mdi:close" class="w-4 h-4 mr-1" />
+                                                ยกเลิก
+                                            </button>
+                                        </template>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -533,13 +591,28 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, inject, nextTick, onBeforeUnmount } from 'vue';
 import { Icon } from '@iconify/vue';
 import PageHeader from '@/components/PageHeader.vue';
 import ResultCount from '@/components/ResultCount.vue';
 import { useBacklogStore } from '@/stores/modules/backlog.js';
 import { useOmsBacklogStore } from '@/stores/modules/oms/manage/backlog.js';
+import { showError, showWarning, showSuccess, showInfo } from '@/utils/toast';
 
+// Inject sidebar state from App.vue
+const sidebarWidth = inject('sidebarWidth', computed(() => 300));
+const isSidebarCollapsed = inject('isSidebarCollapsed', computed(() => false));
+
+// Computed property for table max-width
+const tableMaxWidth = computed(() => {
+    const baseWidth = isSidebarCollapsed.value ? 130 : 352;
+    return `calc(100vw - ${baseWidth}px)`;
+});
+
+// Scroll navigation state
+const tableContainer = ref(null);
+const showScrollLeftButton = ref(false);
+const showScrollRightButton = ref(false);
 
 // Store
 const backlogStore = useBacklogStore();
@@ -560,9 +633,13 @@ const selectedDetailData = ref(null);
 const detailData = ref([]);
 const isPoDetailModalVisible = ref(false);
 const selectedPo = ref(null);
+const isDetailLoading = ref(false);
 
-// State for confirm reload
-const showConfirmReload = ref(false);
+// Reason options state
+const reasonOptions = ref([]);
+const isLoadingReasonOptions = ref(false);
+
+// State for reload
 const isReloading = ref(false);
 
 // State for saving multiple
@@ -570,6 +647,9 @@ const isSavingMultiple = ref(false);
 const savePercentage = ref(0);
 const saveProgress = ref(0);
 const totalToSave = ref(0);
+
+// State for export
+const isExporting = ref(false);
 
 // Computed properties from stores
 const isLoadingTransport = computed(() => omsBacklogStore.isLoadingWarehouse);
@@ -593,6 +673,13 @@ watch(selectedDC, (val) => {
     console.log('Selected DC changed:', val);
 });
 
+// Watch for data changes to update scroll buttons
+watch(() => omsBacklogStore.filteredPlanningData, () => {
+    nextTick(() => {
+        checkScrollPosition();
+    });
+}, { deep: true });
+
 
 // Call API on component mount
 onMounted(() => {
@@ -600,8 +687,18 @@ onMounted(() => {
     omsBacklogStore.fetchWarehouseData();
     console.log('Component mounted - loading warehouse data');
 
+    // ดึงข้อมูล reason options
+    fetchReasonOptions();
+
     // Add click outside listener
     document.addEventListener('click', handleClickOutside);
+
+    // Add scroll listener for table navigation
+    if (tableContainer.value) {
+        tableContainer.value.addEventListener('scroll', checkScrollPosition);
+        // Initial check
+        checkScrollPosition();
+    }
 
     // Auto load data if DC is already selected
     if (selectedDC.value) {
@@ -610,9 +707,44 @@ onMounted(() => {
     }
 });
 
+// Cleanup event listeners
+onBeforeUnmount(() => {
+    if (tableContainer.value) {
+        tableContainer.value.removeEventListener('scroll', checkScrollPosition);
+    }
+    document.removeEventListener('click', handleClickOutside);
+});
+
 // Function to confirm reload
 const confirmReload = async () => {
-    console.log('Confirm reload - placeholder');
+    if (!selectedDC.value) {
+        showWarning('กรุณาเลือก DC ก่อน');
+        return;
+    }
+
+    try {
+        isReloading.value = true;
+        
+        // เรียก API เพื่อดึงข้อมูลใหม่
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const url = `${baseUrl}/api/oms/manage/backlog/data-bl?who=${selectedDC.value}`;
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success) {
+            showSuccess('ดึงข้อมูลใหม่สำเร็จ');
+            // โหลดข้อมูลใหม่หลังจากดึงข้อมูลสำเร็จ
+            await loadData();
+        } else {
+            showError(result.message || 'เกิดข้อผิดพลาดในการดึงข้อมูลใหม่');
+        }
+    } catch (error) {
+        console.error('Error reloading data:', error);
+        showError('เกิดข้อผิดพลาดในการดึงข้อมูลใหม่');
+    } finally {
+        isReloading.value = false;
+    }
 };
 
 // Function to load data with selected DC and Status
@@ -626,6 +758,11 @@ const loadData = async () => {
         if (selectedProvinces.value.length > 0) {
             omsBacklogStore.setProvinceFilter(selectedProvinces.value);
         }
+
+        // Check scroll position after data loads
+        nextTick(() => {
+            checkScrollPosition();
+        });
     }
 };
 
@@ -641,6 +778,39 @@ const getTotalPOs = () => {
     return omsBacklogStore.filteredPlanningData.reduce((total, province) => {
         return total + province.total;
     }, 0);
+};
+
+// Scroll navigation functions
+const scrollToLeft = () => {
+    if (tableContainer.value) {
+        tableContainer.value.scrollTo({
+            left: 0,
+            behavior: 'smooth'
+        });
+    }
+};
+
+const scrollToRight = () => {
+    if (tableContainer.value) {
+        const scrollWidth = tableContainer.value.scrollWidth;
+        const clientWidth = tableContainer.value.clientWidth;
+        tableContainer.value.scrollTo({
+            left: scrollWidth - clientWidth,
+            behavior: 'smooth'
+        });
+    }
+};
+
+const checkScrollPosition = () => {
+    if (tableContainer.value) {
+        const { scrollLeft, scrollWidth, clientWidth } = tableContainer.value;
+        
+        // Show left button if scrolled away from left
+        showScrollLeftButton.value = scrollLeft > 10;
+        
+        // Show right button if not scrolled to the end
+        showScrollRightButton.value = scrollLeft < (scrollWidth - clientWidth - 10);
+    }
 };
 
 // Province filter functions
@@ -671,58 +841,275 @@ const handleClickOutside = (event) => {
 };
 
 // Modal functions
-const openDetailModal = (item) => {
+const openDetailModal = async (item, clickedDate = null) => {
     selectedDetailData.value = item;
-    detailData.value = generateMockDetailData();
     showDetailModal.value = true;
+    isDetailLoading.value = true;
+
+    // เรียก API เพื่อดึงข้อมูลรายละเอียด
+    try {
+        const response = await fetchCustomerReasonData(item, clickedDate);
+        detailData.value = response;
+    } catch (error) {
+        console.error('Error fetching customer reason data:', error);
+        detailData.value = [];
+    } finally {
+        isDetailLoading.value = false;
+    }
 };
+
+// ฟังก์ชันเรียก API เพื่อดึงข้อมูลรายละเอียด
+const fetchCustomerReasonData = async (item, clickedDate = null) => {
+    try {
+        // สร้าง URL สำหรับ API call
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const who = selectedDC.value;
+        const codeProvince = item.id; // ใช้ province code จาก item
+
+        // ใช้วันที่ที่คลิก หรือถ้าไม่มีให้ใช้วันที่ปัจจุบัน
+        let date;
+        if (clickedDate) {
+            // แปลงวันที่จาก format ที่ใช้ในตาราง (เช่น "2025-07-29") เป็น YYYY-MM-DD
+            date = clickedDate;
+        } else {
+            date = new Date().toISOString().split('T')[0]; // วันที่ปัจจุบัน
+        }
+
+        const url = `${baseUrl}/api/oms/manage/backlog/customer-reason?who=${who}&codeProvince=${codeProvince}&date=${date}`;
+
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.success && result.data) {
+            // ใช้ข้อมูลจาก API โดยตรง โดยไม่ต้อง map เปลี่ยนชื่อฟิลด์
+            return result.data;
+        }
+
+        return [];
+    } catch (error) {
+        console.error('Error fetching customer reason data:', error);
+        return [];
+    }
+};
+
+
 
 const closeDetailModal = () => {
     showDetailModal.value = false;
     selectedDetailData.value = null;
 };
 
-const generateMockDetailData = () => {
-    // Mockup detail data based on the item
-    const mockDetailData = [
-        {
-            warehouse: '111',
-            srDate: '26/2/2025',
-            deliveryDate: '3/3/2025',
-            poNumber: '680215082',
-            customerCode: '11140008',
-            customerName: 'แผงเจ้แมว',
-            province2: 'บางใหญ่',
-            province: 'ต.เสาธงหิน อ.บางใหญ่ จ.นนทบุรี 11140',
-            overdue: -4,
-            fg: 470,
-            pm: 0,
-            reasonEndMonth: 'สินค้าขาดสต๊อก',
-            currentReason: 'ลูกค้าเลื่อนนัด',
-            others: 'เนื่องจากพื้นที่จัดเก็บลูกค้าไม่เพียงพอ',
-            postponeDelivery: ''
-        },
-        {
-            warehouse: '111',
-            srDate: '28/2/2025',
-            deliveryDate: '3/3/2025',
-            poNumber: '680215087',
-            customerCode: '11140046',
-            customerName: 'ร้านพร้อมโชค',
-            province2: 'บางใหญ่',
-            province: 'ต.เสาธงหิน อ.บางใหญ่',
-            overdue: -4,
-            fg: 218,
-            pm: 0,
-            reasonEndMonth: 'สินค้าขาดสต๊อก',
-            currentReason: 'เกินเทียว',
-            others: 'แบ่งส่งสินค้า',
-            postponeDelivery: ''
+// เพิ่มฟังก์ชันใหม่สำหรับเปิด PO Detail Modal
+const openPoDetailModal = async (detail) => {
+    if (detail.po_no) {
+        selectedPo.value = detail;
+        isPoDetailModalVisible.value = true;
+        
+        // เรียก API ใหม่เพื่อดึงข้อมูลรายละเอียด PO
+        try {
+            await fetchPoItems(detail.po_no);
+        } catch (error) {
+            console.error('Error fetching PO items:', error);
         }
-    ];
-
-    return mockDetailData;
+    }
 };
+
+// ฟังก์ชันใหม่สำหรับดึงข้อมูล items จาก API
+const fetchPoItems = async (poNo) => {
+    try {
+        // ตั้งค่า loading state
+        backlogStore.isDetailsLoading = true;
+        backlogStore.detailsError = null;
+        
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const url = `${baseUrl}/api/oms/manage/backlog/items?poNo=${poNo}`;
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            // อัปเดตข้อมูลใน store หรือ state
+            backlogStore.poDetails = result.data;
+            backlogStore.isDetailsLoading = false;
+        } else {
+            throw new Error(result.message || 'Failed to fetch PO items');
+        }
+    } catch (error) {
+        console.error('Error fetching PO items:', error);
+        backlogStore.detailsError = error.message || 'เกิดข้อผิดพลาดในการดึงข้อมูล';
+        backlogStore.isDetailsLoading = false;
+    }
+};
+
+// ฟังก์ชันสำหรับกำหนด class ของสถานะ
+const getStatusClass = (status) => {
+    const statusMap = {
+        33: 'bg-green-100 text-green-800',
+        34: 'bg-yellow-100 text-yellow-800',
+        35: 'bg-red-100 text-red-800',
+        36: 'bg-blue-100 text-blue-800'
+    };
+    return statusMap[status] || 'bg-gray-100 text-gray-800';
+};
+
+// เพิ่มฟังก์ชันปิด PO Detail Modal
+const closePoDetailModal = () => {
+    // ยืนยันก่อนปิด modal
+    // if (confirm('คุณต้องการปิดรายละเอียดใบสั่งซื้อหรือไม่?')) {
+        isPoDetailModalVisible.value = false;
+        selectedPo.value = null;
+    // }
+};
+
+// ฟังก์ชันบันทึกการแก้ไขข้อมูลรายละเอียด
+const saveDetailEdit = async (detail) => {
+    try {
+        // เรียกฟังก์ชัน updateReason จาก store เพื่ออัปเดตข้อมูล
+        await omsBacklogStore.updateReason(detail);
+
+        // ปิดโหมดแก้ไข
+        detail.editing = false;
+
+        console.log('บันทึกข้อมูลสำเร็จ:', detail);
+    } catch (error) {
+        console.error('เกิดข้อผิดพลาดในการบันทึก:', error);
+    }
+};
+
+// ฟังก์ชัน export Excel
+const exportToExcel = async () => {
+    if (!selectedDC.value) {
+        showWarning('กรุณาเลือก DC ก่อน');
+        return;
+    }
+
+    try {
+        isExporting.value = true;
+        
+        // เรียก API เพื่อดึงข้อมูลสำหรับ export
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const url = `${baseUrl}/api/oms/manage/backlog/export?who=${selectedDC.value}`;
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success && result.data && result.data.length > 0) {
+            // สร้าง Excel file
+            await generateExcelFile(result.data);
+        } else {
+            showWarning('ไม่พบข้อมูลสำหรับ export');
+        }
+    } catch (error) {
+        console.error('Error exporting data:', error);
+        showError('เกิดข้อผิดพลาดในการ export ข้อมูล');
+    } finally {
+        isExporting.value = false;
+    }
+};
+
+// ฟังก์ชันสร้างไฟล์ Excel
+const generateExcelFile = async (data) => {
+    try {
+        // สร้าง worksheet data
+        const worksheetData = data.map((item, index) => [
+            index + 1, // ลำดับ
+            item.wh_no || '',
+            item.sr_date || '',
+            item.date_send || '',
+            item.po_no || '',
+            item.cus_code?.trim() || '',
+            item.cus_name || '',
+            item.name_province || '',
+            item.provincebl || '',
+            item.od || 0,
+            item.fg || 0,
+            item.pm || 0,
+            item.note || '',
+            item.note_etc || '',
+            item.pastpone_delivery || ''
+        ]);
+
+        // เพิ่ม header
+        const headers = [
+            'ลำดับ',
+            'คลัง',
+            'SR Date',
+            'กำหนดส่ง',
+            'เลขที่ใบสั่งซื้อ',
+            'รหัสลูกค้า',
+            'ชื่อลูกค้า',
+            'จังหวัด',
+            'ที่อยู่',
+            'เกิน',
+            'FG',
+            'PM',
+            'สาเหตุ',
+            'อื่นๆ (ระบุ)',
+            'เลื่อนส่ง'
+        ];
+
+        // รวม headers และ data
+        const excelData = [headers, ...worksheetData];
+
+        // สร้าง CSV content
+        const csvContent = excelData.map(row => 
+            row.map(cell => `"${cell}"`).join(',')
+        ).join('\n');
+
+        // สร้างและดาวน์โหลดไฟล์
+        const blob = new Blob(['\ufeff' + csvContent], { 
+            type: 'text/csv;charset=utf-8;' 
+        });
+        
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `backlog_export_${selectedDC.value}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showSuccess('Export สำเร็จ!');
+    } catch (error) {
+        console.error('Error generating Excel file:', error);
+        showError('เกิดข้อผิดพลาดในการสร้างไฟล์ Excel');
+    }
+};
+
+// ฟังก์ชันดึงข้อมูล reason options
+const fetchReasonOptions = async () => {
+    try {
+        isLoadingReasonOptions.value = true;
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const url = `${baseUrl}/api/oms/manage/backlog/reason-options`;
+
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.success && result.data) {
+            reasonOptions.value = result.data;
+            console.log('Reason options loaded:', reasonOptions.value);
+        } else {
+            console.error('Failed to load reason options:', result);
+            reasonOptions.value = [];
+        }
+    } catch (error) {
+        console.error('Error fetching reason options:', error);
+        reasonOptions.value = [];
+    } finally {
+        isLoadingReasonOptions.value = false;
+    }
+};
+
+// ฟังก์ชันแปลง reason_id เป็น reason_name สำหรับแสดงผล
+const getReasonName = (reasonId) => {
+    if (!reasonId) return null;
+    const reason = reasonOptions.value.find(r => r.reason_id == reasonId);
+    return reason ? reason.reason_name : reasonId;
+};
+
+// ฟังก์ชันนี้ถูกลบออกแล้วเพราะใช้ข้อมูลจาก API แทน
 
 
 const onDCChange = () => {
@@ -859,6 +1246,7 @@ onMounted(() => {
 .virtual-table-container {
     scrollbar-width: thin;
     scrollbar-color: #cbd5e0 #f7fafc;
+    position: relative;
 }
 
 .virtual-table-container::-webkit-scrollbar {
@@ -878,6 +1266,46 @@ onMounted(() => {
 
 .virtual-table-container::-webkit-scrollbar-thumb:hover {
     background: #a0aec0;
+}
+
+/* Scroll navigation buttons */
+.scroll-nav-button {
+    position: sticky;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    background: rgba(37, 99, 235, 0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.scroll-nav-button.left-0 {
+    left: 0;
+    margin-left: 8px;
+}
+
+.scroll-nav-button.right-0 {
+    right: 0;
+    margin-right: 8px;
+}
+
+.scroll-nav-button:hover {
+    background: rgba(29, 78, 216, 0.9);
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.scroll-nav-button:active {
+    transform: translateY(-50%) scale(0.95);
 }
 
 /* Ensure table rows have consistent height */

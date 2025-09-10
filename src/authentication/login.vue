@@ -142,12 +142,13 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/modules/auth';
 import { Icon } from '@iconify/vue';
 import { apiClient } from '@/utils/api';
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 
 // Form data
@@ -184,7 +185,23 @@ const handleLogin = async () => {
   if (result.success) {
     form.username = '';
     form.password = '';
-    router.push('/dashboard');
+    
+    // Get redirect URL from query parameter
+    const redirectUrl = route.query.redirect;
+    
+    // Redirect to intended URL or default to dashboard
+    if (redirectUrl && typeof redirectUrl === 'string') {
+      try {
+        // Decode the redirect URL
+        const decodedUrl = decodeURIComponent(redirectUrl);
+        router.push(decodedUrl);
+      } catch (error) {
+        console.error('Error decoding redirect URL:', error);
+        router.push('/dashboard');
+      }
+    } else {
+      router.push('/dashboard');
+    }
   } else if (result.code === 'PASSWORD_EXPIRED' || result.error === 'PASSWORD_EXPIRED') {
     // Show change password modal
     showChangePassword.value = true;
@@ -230,7 +247,22 @@ const submitChangePassword = async () => {
 onMounted(() => {
   authStore.initAuth();
   if (authStore.isAuthenticated) {
-    router.push('/dashboard');
+    // Get redirect URL from query parameter
+    const redirectUrl = route.query.redirect;
+    
+    // Redirect to intended URL or default to dashboard
+    if (redirectUrl && typeof redirectUrl === 'string') {
+      try {
+        // Decode the redirect URL
+        const decodedUrl = decodeURIComponent(redirectUrl);
+        router.push(decodedUrl);
+      } catch (error) {
+        console.error('Error decoding redirect URL:', error);
+        router.push('/dashboard');
+      }
+    } else {
+      router.push('/dashboard');
+    }
   }
 });
 
